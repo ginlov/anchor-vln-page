@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="AnchorVLN: Geometry-Anchored Vision-Language Grounding Reasoning for Open-Vocabulary Navigation">
+  <meta name="keywords" content="AnchorVLN, vision-language navigation, VLN, embodied AI, MCP, geometric grounding, open-vocabulary, robotics, IROS 2026">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta property="og:image" content="./static/images/scene_graph.png" />
+  <meta property="og:title" content="AnchorVLN: Geometry-Anchored Vision-Language Grounding Reasoning for Open-Vocabulary Navigation" />
+  <meta property="og:description" content="Geometry-backed MCP tools that let VLMs navigate without hallucinating coordinates." />
+
+  <title>AnchorVLN</title>
+
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <style>
+    :root {
+      --navy: #0f2b46;
+      --blue: #2563eb;
+      --amber: #d97706;
+      --teal: #1a5a68;
+      --text: #1a202c;
+      --muted: #4a5568;
+      --bg: #ffffff;
+      --bg-alt: #f7f9fc;
+      --border: #e2e8f0;
+    }
+
+    body {
+      font-family: 'Noto Sans', sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .hero-section {
+      background:
+        radial-gradient(ellipse at 20% 0%, rgba(37,99,235,0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 0%, rgba(217,119,6,0.05) 0%, transparent 50%),
+        var(--bg);
+      padding: 3rem 1.5rem 2rem;
+      text-align: center;
+    }
+
+    .paper-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 2.5rem;
+      font-weight: 700;
+      line-height: 1.15;
+      color: var(--navy);
+      max-width: 880px;
+      margin: 0 auto;
+      text-wrap: balance;
+    }
+
+    .paper-title .hl { color: var(--blue); }
+
+    .venue-badge {
+      display: inline-block;
+      margin-top: 0.9rem;
+      padding: 0.3rem 1rem;
+      border-radius: 999px;
+      background: var(--navy);
+      color: #fff;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .venue-badge .award { color: #fbbf24; }
+
+    .author-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.3rem 1.4rem;
+      margin-top: 1rem;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1rem;
+    }
+
+    .author-row a { color: var(--blue); text-decoration: none; }
+    .author-row a:hover { text-decoration: underline; }
+    .author-row sup { font-size: 0.65em; position: relative; top: -0.5em; }
+
+    .equal-note {
+      font-size: 0.85rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-top: 0.3rem;
+    }
+
+    .link-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1.2rem;
+    }
+
+    .link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 1rem;
+      border-radius: 8px;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .link-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .link-btn.dark { background: var(--navy); color: #fff; }
+    .link-btn.light { background: var(--bg); color: var(--navy); border: 1.5px solid var(--border); }
+
+    /* sections */
+    .content-section {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    .section-heading {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 0.8rem;
+      border-bottom: 3px solid var(--blue);
+      display: inline-block;
+      padding-bottom: 0.35rem;
+    }
+
+    /* insight banner */
+    .insight {
+      background: var(--navy);
+      border-radius: 14px;
+      padding: 1.5rem 2rem;
+      text-align: center;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .insight-label {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin-bottom: 0.4rem;
+    }
+
+    .insight-text {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: #fff;
+      line-height: 1.4;
+      text-wrap: pretty;
+    }
+
+    .insight-text em { color: #fbbf24; font-style: italic; }
+
+    /* figures */
+    .fig { text-align: center; margin: 1.5rem 0; }
+
+    .fig img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.07);
+      border: 1px solid var(--border);
+    }
+
+    .fig-cap {
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin-top: 0.6rem;
+      line-height: 1.5;
+    }
+
+    .fig-cap strong { color: var(--text); }
+
+    /* stats */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.8rem;
+      margin: 1.2rem 0;
+    }
+
+    .stat-card {
+      text-align: center;
+      padding: 1rem 0.5rem;
+      border-radius: 10px;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+    }
+
+    .stat-val {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--blue);
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-val .u { font-size: 0.9rem; font-weight: 500; color: var(--muted); }
+
+    .stat-lbl {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+      line-height: 1.3;
+    }
+
+    /* tables */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      margin: 1rem 0;
+    }
+
+    .res-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .res-table thead { background: var(--bg-alt); }
+
+    .res-table th {
+      font-family: 'Google Sans', sans-serif;
+      font-weight: 600;
+      font-size: 0.8rem;
+      color: var(--muted);
+      padding: 0.6rem 0.8rem;
+      text-align: center;
+      border-bottom: 1.5px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .res-table th:first-child { text-align: left; }
+
+    .res-table td {
+      padding: 0.55rem 0.8rem;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .res-table td:first-child { text-align: left; font-weight: 600; }
+    .res-table tbody tr:last-child td { border-bottom: none; }
+    .res-table .best { font-weight: 700; color: var(--blue); }
+
+    /* tool interface table */
+    .tool-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      border-top: 2.5px solid var(--text);
+      border-bottom: 2.5px solid var(--text);
+    }
+
+    .tool-table th {
+      padding: 0.5rem 0.7rem;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 1.5px solid var(--text);
+      font-family: 'Google Sans', sans-serif;
+    }
+
+    .tool-table td {
+      padding: 0.45rem 0.7rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tool-table .tool-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      font-size: 0.84rem;
+    }
+
+    .tool-table .cat {
+      padding: 0.4rem 0.7rem 0.15rem;
+      font-style: italic;
+      color: var(--teal);
+      font-weight: 600;
+      font-size: 0.84rem;
+    }
+
+    /* side-by-side comparison */
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .compare-card {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1.5px solid var(--border);
+      background: var(--bg);
+    }
+
+    .compare-card .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0.8rem;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .compare-card .card-header.full { background: #edf4f5; border-bottom: 3px solid var(--teal); color: var(--teal); }
+    .compare-card .card-header.naive { background: #fef2f2; border-bottom: 3px solid #dc2626; color: #dc2626; }
+
+    .compare-card .badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      color: #fff;
+    }
+
+    .badge.hit { background: var(--teal); }
+    .badge.miss { background: #dc2626; }
+
+    .compare-card img {
+      width: 100%;
+      display: block;
+    }
+
+    /* example traces */
+    .trace-block {
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      overflow: hidden;
+      margin: 1rem 0;
+    }
+
+    .trace-header {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      padding: 0.6rem 1rem;
+      background: var(--bg-alt);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .trace-header .scene {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .trace-header .instruction {
+      font-size: 0.95rem;
+      font-style: italic;
+      color: var(--text);
+    }
+
+    .trace-header .tag {
+      margin-left: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #fff;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+    }
+
+    .tag.measured { background: var(--teal); }
+    .tag.refused { background: #b45a1f; }
+
+    .trace-body {
+      display: flex;
+      gap: 1rem;
+      padding: 1rem;
+      align-items: flex-start;
+    }
+
+    .trace-imgs {
+      display: flex;
+      gap: 0.5rem;
+      flex: none;
+    }
+
+    .trace-imgs figure {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .trace-imgs img {
+      width: 140px;
+      height: 140px;
+      border-radius: 6px;
+      border: 1.5px solid var(--border);
+      object-fit: cover;
+      display: block;
+    }
+
+    .trace-imgs figcaption {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .trace-steps {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+
+    .step {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+    }
+
+    .step.reasoning { background: #fbf1ec; border-left: 4px solid #b45a1f; }
+    .step.geometry { background: #edf4f5; border-left: 4px solid var(--teal); }
+
+    .step-num {
+      font-family: 'Google Sans', sans-serif;
+      font-weight: 700;
+      flex: none;
+      width: 1rem;
+    }
+
+    .step.reasoning .step-num { color: #b45a1f; }
+    .step.geometry .step-num { color: var(--teal); }
+
+    .step code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8em;
+      font-weight: 600;
+      color: var(--teal);
+    }
+
+    .trace-takeaway {
+      padding: 0.5rem 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    /* citation */
+    .cite-block {
+      background: var(--bg-alt);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+      position: relative;
+    }
+
+    .cite-block pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      line-height: 1.55;
+      overflow-x: auto;
+      white-space: pre;
+      margin: 0;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 0.6rem;
+      right: 0.6rem;
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 5px;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: 'Google Sans', sans-serif;
+    }
+
+    .copy-btn:hover { border-color: var(--blue); color: var(--blue); }
+
+    .page-footer {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .page-footer a { color: var(--blue); text-decoration: none; }
+    .page-footer a:hover { text-decoration: underline; }
+
+    /* videos */
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .video-card {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1.5px solid var(--border);
+      background: var(--bg);
+    }
+
+    .video-card video {
+      width: 100%;
+      display: block;
+      background: #000;
+    }
+
+    .video-card .vid-cap {
+      padding: 0.5rem 0.8rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.4;
+      border-top: 1px solid var(--border);
+    }
+
+    .video-card .vid-cap strong { color: var(--text); }
+
+    .video-card .vid-desc {
+      padding: 0.3rem 0.8rem 0.6rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .video-card .vid-desc code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      background: #edf4f5;
+      color: var(--teal);
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+
+    /* portability section accent */
+    .portability-banner {
+      background: linear-gradient(135deg, var(--navy) 0%, #1e3a5f 100%);
+      border-radius: 12px;
+      padding: 1.2rem 1.5rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .portability-banner .pb-icon {
+      font-size: 2rem;
+      flex: none;
+    }
+
+    .portability-banner .pb-text {
+      color: #fff;
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .portability-banner .pb-text strong { color: #fbbf24; }
+
+    @media (max-width: 700px) {
+      .paper-title { font-size: 1.6rem; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .compare-grid { grid-template-columns: 1fr; }
+      .trace-body { flex-direction: column; }
+      .trace-imgs img { width: 120px; height: 120px; }
+      .insight-text { font-size: 1.1rem; }
+      .video-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ═══ HERO ═══ -->
+  <section class="hero-section">
+    <h1 class="paper-title">
+      <span class="hl">AnchorVLN</span>: Geometry-Anchored Vision-Language Grounding for Open-Vocabulary Navigation
+    </h1>
+    <div class="venue-badge">IROS 2026 &middot; Bridging Perspectives in Navigation &middot; <span class="award">2nd Place Real-Robot CMU VLN Challenge</span></div>
+    <div class="author-row">
+      <span><a href="#">Long Giang Vu</a><sup>*</sup></span>
+      <span><a href="#">Chengkai Yao</a><sup>*</sup></span>
+      <span><a href="#">Yuxin Liu</a></span>
+      <span><a href="#">Rajath C. Aralikatti</a></span>
+      <span><a href="#">FNU Aryan</a></span>
+    </div>
+    <p class="equal-note">* Equal Contribution</p>
+    <div class="link-row">
+      <a href="https://arxiv.org/abs/2609.12285" class="link-btn dark" target="_blank"><i class="ai ai-arxiv"></i> arXiv</a>
+      <a href="https://arxiv.org/pdf/2609.12285" class="link-btn light" target="_blank"><i class="fas fa-file-pdf"></i> Paper</a>
+      <!-- <a href="#" class="link-btn light" target="_blank"><i class="fab fa-github"></i> Code</a> -->
+    </div>
+  </section>
+
+  <!-- ═══ CONTRIBUTIONS ═══ -->
+  <div style="padding: 0 1rem;">
+    <div class="insight" style="text-align:left;">
+      <div style="display:flex; flex-direction:column; gap:0.6rem;">
+        <div class="insight-text" style="font-size:1.05rem; line-height:1.5;"><strong style="color:var(--amber);">①</strong>&ensp;A <em>semantic–geometric decoupling</em> enforced by the MCP schema  - no tool takes a metric argument, so the VLM does language-to-pixel grounding and LiDAR produces the metres.</div>
+        <div class="insight-text" style="font-size:1.05rem; line-height:1.5;"><strong style="color:var(--amber);">②</strong>&ensp;Open-vocabulary perception at high frequency (scene graph at 2&thinsp;Hz) paired with low-frequency VLM reasoning, enabling the agent to detect and ground novel objects without a fixed vocabulary.</div>
+        <div class="insight-text" style="font-size:1.05rem; line-height:1.5;"><strong style="color:var(--amber);">③</strong>&ensp;Decision-level reasoning  - the VLM composes tool calls at inference time, replacing hand-scripted per-tick planners.</div>
+        <div class="insight-text" style="font-size:1.05rem; line-height:1.5;"><strong style="color:var(--amber);">④</strong>&ensp;A unified, portable framework: the same MCP interface runs on different robot platforms without rewriting the control stack.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ABSTRACT ═══ -->
+  <section class="content-section">
+    <h2 class="section-heading">Abstract</h2>
+    <p style="line-height:1.7; text-align:justify;">
+      We address Vision-Language Navigation in unseen indoor environments where robots must follow natural-language instructions and locate referred objects without pre-built maps or fixed vocabularies.
+      VLMs excel at semantic understanding but cannot reliably emit metric quantities such as range and bearing.
+      We implement this separation as <strong>Embodied-Nav-MCP</strong>, a Model Context Protocol server whose 10 callable tools inherently enforce metric boundaries -no tool accepts distance in meters or bearing in radians -preventing hallucinated coordinates from reaching the robot.
+      On the CMU VLN Challenge&nbsp;2026 development set, AnchorVLN achieves <strong>64.4%</strong> instruction-following accuracy and clears the object-reference overlap threshold on <strong>10&thinsp;/&thinsp;45</strong> questions versus&nbsp;0 for direct estimation.
+    </p>
+  </section>
+
+  <!-- ═══ KEY RESULTS ═══ -->
+  <section class="content-section" style="padding-top:0;">
+    <h2 class="section-heading">Key Results</h2>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-val">64.4<span class="u">%</span></div>
+        <div class="stat-lbl">Instruction Following</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">10<span class="u">/45</span></div>
+        <div class="stat-lbl">Object Reference Hits</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">2.48<span class="u">m</span></div>
+        <div class="stat-lbl">Median Center Error</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">2<span class="u">nd</span></div>
+        <div class="stat-lbl">Real-Robot CMU VLN Challenge</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ SYSTEM DIAGRAM ═══ -->
+  <section class="content-section" style="padding-top:0;">
+    <h2 class="section-heading">System Architecture</h2>
+    <div class="fig">
+      <img src="./static/images/system_diagram.png" alt="AnchorVLN system architecture: Scene graph builder feeds into NAV SYS with VLM client (reasoning) separated from Embodied Navigation MCP (geometry) by a dashed boundary" style="border-radius:8px;">
+      <p class="fig-cap"><strong>Figure 1.</strong> AnchorVLN architecture. The VLM client reasons about <em>what</em> to look for (phrases); the Embodied Navigation MCP decides <em>where</em> it is (geometry). No metric value crosses the dashed boundary  - only phrases and opaque handles.</p>
+    </div>
+  </section>
+
+  <!-- ═══ MCP INTERFACE ═══ -->
+  <section class="content-section" style="padding-top:0;">
+    <h2 class="section-heading">The MCP Interface</h2>
+    <p style="margin-bottom:0.8rem; line-height:1.6;">
+      Every input is a phrase or a handle from an earlier call  - <strong>no input is a number</strong>  - so the client can name a measurement the system has made but cannot author one.
+    </p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+      <div class="table-wrap">
+        <table class="tool-table">
+          <thead><tr><th>Tool</th><th>Input</th><th>Returns</th></tr></thead>
+          <tbody>
+            <tr><td colspan="3" class="cat">Perception  - query or steer; robot stays put</td></tr>
+            <tr><td class="tool-name">ground</td><td>phrase</td><td>handles, or refusal</td></tr>
+            <tr><td class="tool-name">expand_vocab</td><td>phrase</td><td>classes added</td></tr>
+            <tr><td class="tool-name">verify_present</td><td>phrase</td><td>handle, or not found</td></tr>
+            <tr><td class="tool-name">nearest</td><td>handles, anchor</td><td>handle</td></tr>
+            <tr><td class="tool-name">farthest</td><td>handles, anchor</td><td>handle</td></tr>
+            <tr><td class="tool-name">between</td><td>two handles</td><td>handle (a passage)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="table-wrap">
+        <table class="tool-table">
+          <thead><tr><th>Tool</th><th>Input</th><th>Returns</th></tr></thead>
+          <tbody>
+            <tr><td colspan="3" class="cat">Motion  - the vehicle moves</td></tr>
+            <tr><td class="tool-name">drive_to</td><td>handle</td><td>arrived, moved, stalled</td></tr>
+            <tr><td class="tool-name">explore</td><td>handles to avoid</td><td>handles newly seen</td></tr>
+            <tr><td class="tool-name">orbit</td><td>handle</td><td>same handle, refined</td></tr>
+            <tr><td colspan="3" class="cat">Output</td></tr>
+            <tr><td class="tool-name">publish</td><td>handle</td><td> -</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ EXPERIMENT SETUP ═══ -->
+  <section class="content-section" style="padding-top:0;">
+    <h2 class="section-heading">Experiment Setup</h2>
+    <div class="fig">
+      <img src="./static/images/challenge_scenes.png" alt="Three of the fifteen CMU VLN Challenge scenes" style="border-radius:8px;">
+      <p class="fig-cap">
+        <strong>CMU VLN Challenge 2026</strong>  - 15 indoor scenes, 10-min budget per question.<br>
+        <strong>Instruction following:</strong> drive a free-form language instruction; scored on the trajectory.
+        <strong>Object reference:</strong> find the referred object and answer with its 3D bounding box.
+      </p>
+    </div>
+    <div class="fig" style="margin-top:1.5rem;">
+      <img src="./static/images/scene_graph.png" alt="3D scene graph of livingroom_1  - dozens of objects as coloured point clusters in map coordinates">
+      <p class="fig-cap">Each colour is one <strong>object record</strong>  - id, label, 3D box  - fused from LiDAR sweeps at 2&thinsp;Hz and refined as the robot moves. Every handle the VLM client uses points into this graph.</p>
+    </div>
+  </section>
+
+  <!-- ═══ RESULTS ═══ -->
+  <section class="content-section" style="padding-top:0;">
+    <h2 class="section-heading">Results</h2>
+    <div class="table-wrap">
+      <table class="res-table">
+        <thead>
+          <tr><th>Arm</th><th>Score</th><th>Δ</th><th><i>t</i></th><th>nDTW</th><th>TL</th><th>Approach</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Full system</td><td class="best">64.4%</td><td>–</td><td>–</td><td class="best">0.360</td><td>1.23</td><td class="best">1.58 m</td></tr>
+          <tr><td>w/o Lift</td><td>63.6%</td><td>−0.8</td><td>0.23</td><td>0.279</td><td>1.53</td><td>1.73 m</td></tr>
+          <tr><td>w/o Platform Model</td><td>51.1%</td><td style="font-weight:700">−13.3</td><td style="font-weight:700">2.77</td><td>0.352</td><td>0.79</td><td>2.10 m</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="table-wrap">
+      <table class="res-table">
+        <thead><tr><th>Arm</th><th>Hit (IoU ≥ 0.1)</th><th>Mean IoU</th></tr></thead>
+        <tbody>
+          <tr><td>Full system (grounded)</td><td class="best">22%</td><td class="best">0.060</td></tr>
+          <tr><td>w/o tool structure (naive)</td><td>18%</td><td>0.054</td></tr>
+          <tr><td>w/o geometric grounding</td><td>0%</td><td>0.000</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══ MCP TOOL ILLUSTRATION ═══ -->
+  <section class="content-section" style="padding-top:0;">
+    <h2 class="section-heading">MCP Tool Illustration</h2>
+    <p style="margin-bottom:0.8rem; font-size:0.92rem; color:var(--muted);">
+      Recorded steps traced through MCP tools: the VLM reasons about <em>what</em>; perception measures <em>where</em>.
+    </p>
+
+    <!-- Example 1: arabic_room -->
+    <div class="trace-block">
+      <div class="trace-header">
+        <span class="scene">arabic_room</span>
+        <span class="instruction">"Drive to the potted plant furthest from the hookah"</span>
+        <span class="tag measured">MEASURED</span>
+      </div>
+      <div class="trace-body">
+        <div class="trace-imgs">
+          <figure>
+            <img src="./static/images/arabic_room_back.jpg" alt="Back view: potted plant by doorway, boxed in red">
+            <figcaption>back · target</figcaption>
+          </figure>
+          <figure>
+            <img src="./static/images/arabic_room_front.jpg" alt="Front view: second plant and hookah on table">
+            <figcaption>front · anchor</figcaption>
+          </figure>
+        </div>
+        <div class="trace-steps">
+          <div class="step reasoning"><span class="step-num">1</span><div><code>ground</code>'s VLM names 2 candidate plants and the hookah anchor.</div></div>
+          <div class="step geometry"><span class="step-num">2</span><div>Each box is lifted through the LiDAR scan into a handle.</div></div>
+          <div class="step geometry"><span class="step-num">3</span><div><code>farthest</code>(plants, hookah) → the plant by the doorway.</div></div>
+          <div class="step geometry"><span class="step-num">4</span><div><code>drive_to</code> → settles, moved 1.10 m.</div></div>
+        </div>
+      </div>
+      <div class="trace-takeaway">VLM determines candidate objects. MCP leverages perception toolbox and compares candidate distances.</div>
+    </div>
+
+    <!-- Example 2: office_2 -->
+    <div class="trace-block">
+      <div class="trace-header">
+        <span class="scene">office_2</span>
+        <span class="instruction">"Drive to the window closest to the clock"</span>
+        <span class="tag refused">REFUSED · IMPLIED SIZE</span>
+      </div>
+      <div class="trace-body">
+        <div class="trace-imgs">
+          <figure>
+            <img src="./static/images/office_front.jpg" alt="Front view: candidate windows in orange, chosen in red">
+            <figcaption>front · candidates</figcaption>
+          </figure>
+          <figure>
+            <img src="./static/images/office_right.jpg" alt="Right view: wall clock boxed in blue">
+            <figcaption>right · anchor</figcaption>
+          </figure>
+        </div>
+        <div class="trace-steps">
+          <div class="step reasoning"><span class="step-num">1</span><div><code>ground</code>'s VLM names candidate windows and the clock anchor.</div></div>
+          <div class="step geometry"><span class="step-num">2</span><div><code>nearest</code>(windows, clock) → the right-hand sash window.</div></div>
+          <div class="step geometry"><span class="step-num">3</span><div>Implied-size gate: 28.15 m through glass ⇒ a 15.88 m window. Lift refused.</div></div>
+          <div class="step geometry"><span class="step-num">4</span><div><code>drive_to</code> takes a capped step (0.93 m) toward the window, then looks again.</div></div>
+        </div>
+      </div>
+      <div class="trace-takeaway">LiDAR passes through the glass and realizes range is too far. The box implies a 15.88 m window. Refused.</div>
+    </div>
+  </section>
+
+  <!-- ═══ DEMO VIDEOS ═══ -->
+  <section class="content-section" style="padding-top:0;">
+    <h2 class="section-heading">Demo Videos</h2>
+    <p style="margin-bottom:0.8rem; font-size:0.92rem; color:var(--muted); line-height:1.6;">
+      Across all examples, <code>ground</code> resolves objects the scene graph has not yet detected, and <code>drive_to</code> is the fundamental motion primitive.
+    </p>
+    <div class="video-grid">
+      <div class="video-card">
+        <video controls preload="metadata" playsinline>
+          <source src="./static/videos/l1-20261005-030404-v2.mp4" type="video/mp4">
+        </video>
+        <div class="vid-cap"><strong>Living room:</strong> Go to the dining table, then go to the fireplace.</div>
+        <div class="vid-desc">The VLM decides at each step whether the current viewpoint is sufficient to commit to an object or whether further exploration is needed. When it realizes the camera elevation is too low, it autonomously changes viewpoint before continuing.</div>
+      </div>
+      <div class="video-card">
+        <video controls preload="metadata" playsinline>
+          <source src="./static/videos/l2-20261005-030404-v2.mp4" type="video/mp4">
+        </video>
+        <div class="vid-cap"><strong>Living room:</strong> Find the horse figurine above the fireplace.</div>
+        <div class="vid-desc">The agent uses <code>explore</code> to collect all candidate objects across the scene, then selects the correct one using the anchor object (the fireplace) via <code>nearest</code>.</div>
+      </div>
+      <div class="video-card">
+        <video controls preload="metadata" playsinline>
+          <source src="./static/videos/l3-20261005-030404-v2.mp4" type="video/mp4">
+        </video>
+        <div class="vid-cap"><strong>Living room:</strong> Find the fossil decoration on the bookcase.</div>
+        <div class="vid-desc">The initial vocabulary does not include "fossil." The VLM calls <code>expand_vocab</code> to add it to the detector, enabling the scene graph to localize the object on the next perception tick.</div>
+      </div>
+      <div class="video-card">
+        <video controls preload="metadata" playsinline>
+          <source src="./static/videos/j3-20261005-030404-v2.mp4" type="video/mp4">
+        </video>
+        <div class="vid-cap"><strong>Japanese room:</strong> Find the vase closest to the zen stone decoration.</div>
+        <div class="vid-desc">Combines <code>expand_vocab</code> for "zen stone" with <code>orbit</code> around the candidate to refine the 3D bounding box before committing to a localization answer.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ ABLATION STUDIES ═══ -->
+  <section class="content-section" style="padding-top:0;">
+    <h2 class="section-heading">Ablation Studies</h2>
+
+    <p style="margin-bottom:0.6rem; font-size:0.92rem; font-style:italic; color:var(--text);">"the table closest to the dish"</p>
+    <div class="compare-grid">
+      <div class="compare-card">
+        <div class="card-header full">
+          Full system <span style="font-weight:400; font-size:0.8rem;">with explore</span>
+          <span class="badge hit">HIT · IoU 0.32</span>
+        </div>
+        <img src="./static/images/ablation_full_tatami.jpg" alt="Full system: picks the correct low table beside the dish">
+        <img src="./static/images/ablation_full_graph.png" alt="Full system scene graph: many objects, two table candidates">
+      </div>
+      <div class="compare-card">
+        <div class="card-header naive">
+          Naive <span style="font-weight:400; font-size:0.8rem;">no explore</span>
+          <span class="badge miss">MISS · IoU 0.00</span>
+        </div>
+        <img src="./static/images/ablation_naive_tatami.jpg" alt="Naive: picks the only table in its sparse graph -the wrong one">
+        <img src="./static/images/ablation_naive_graph.png" alt="Naive scene graph: few objects, single table candidate">
+      </div>
+    </div>
+
+    <p style="margin-top:1.2rem; margin-bottom:0.6rem; font-size:0.92rem; font-style:italic; color:var(--text);">"the fossil decoration closest to the big sofa"</p>
+    <div class="compare-grid">
+      <div class="compare-card">
+        <div class="card-header full">
+          Full system <span style="font-weight:400; font-size:0.8rem;">with expand_vocab</span>
+          <span class="badge hit">HIT · IoU 0.32</span>
+        </div>
+        <img src="./static/images/ablation_full_fossil.jpg" alt="Full system: grounded as nautilus shell sculpture">
+      </div>
+      <div class="compare-card">
+        <div class="card-header naive">
+          Naive <span style="font-weight:400; font-size:0.8rem;">fixed 100-class prior</span>
+          <span class="badge miss">MISS · IoU 0.00</span>
+        </div>
+        <img src="./static/images/ablation_naive_fossil.jpg" alt="Naive: falls back to ammonite artwork, picks wrong instance">
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ CROSS-PLATFORM PORTABILITY ═══ -->
+  <section class="content-section" style="padding-top:0;">
+    <h2 class="section-heading">Cross-Platform Portability</h2>
+    <div class="portability-banner">
+      <div class="pb-icon">🤖</div>
+      <div class="pb-text">
+        The same Embodied-Nav-MCP interface runs on a <strong>humanoid robot</strong>  - only the controller model is replaced. The VLM client, tool schemas, and scene graph are unchanged.
+      </div>
+    </div>
+    <div class="video-grid">
+      <div class="video-card">
+        <video controls preload="metadata" playsinline>
+          <source src="./static/videos/g1-20261005-074923-aligned.mp4" type="video/mp4">
+        </video>
+        <div class="vid-cap"><strong>Apartment:</strong> Go to the dining table, then go to the refrigerator.</div>
+        <div class="vid-desc">Basic sequential navigation using <code>ground</code> and <code>drive_to</code>  - the same tool calls that work on the wheeled platform transfer directly to a humanoid.</div>
+      </div>
+      <div class="video-card">
+        <video controls preload="metadata" playsinline>
+          <source src="./static/videos/g2-20261005-074923-aligned.mp4" type="video/mp4">
+        </video>
+        <div class="vid-cap"><strong>Apartment:</strong> Find the kettle on the kitchen counter.</div>
+        <div class="vid-desc">The agent uses <code>orbit</code> around the kitchen counter to refine the kettle's 3D bounding box before committing to the localization answer.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ CITATION ═══ -->
+  <section class="content-section" style="padding-top:0;">
+    <h2 class="section-heading">BibTeX</h2>
+    <div class="cite-block">
+      <button class="copy-btn" onclick="copyBib()" id="copyBtn"><i class="fas fa-copy"></i> Copy</button>
+<pre>@article{vu2026anchorvln,
+  title   = {AnchorVLN: Geometry-Anchored Vision-Language
+             Grounding for Open-Vocabulary Navigation},
+  author  = {Vu, Long Giang and Yao, Chengkai and Liu, Yuxin
+             and Aralikatti, Rajath Chandrashekar and Aryan, FNU},
+  journal = {arXiv preprint arXiv:2609.12285},
+  year    = {2026}
+}</pre>
+    </div>
+  </section>
+
+  <footer class="page-footer">
+    Template inspired by <a href="https://nerfies.github.io/" target="_blank">Nerfies</a> and <a href="https://viettmab.github.io/visualmem-page/" target="_blank">VisualMem</a>.
+  </footer>
+
+  <script>
+    function copyBib() {
+      var pre = document.querySelector('.cite-block pre');
+      var btn = document.getElementById('copyBtn');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(pre.textContent).then(function() {
+          btn.innerHTML = '<i class="fas fa-check"></i> Copied';
+          setTimeout(function() { btn.innerHTML = '<i class="fas fa-copy"></i> Copy'; }, 2000);
+        });
+      } else {
+        var r = document.createRange();
+        r.selectNodeContents(pre);
+        var s = window.getSelection();
+        s.removeAllRanges();
+        s.addRange(r);
+      }
+    }
+  </script>
+
+</body>
+</html>
